@@ -28,6 +28,8 @@ async function start(overrides: Partial<Config> = {}): Promise<TestServer> {
     token: TOKEN,
     dataDir,
     maxPageBytes: 1024,
+    maxAnswerBytes: 1024,
+    resultWaitMs: 50,
     ...overrides,
   };
   const handler = await createHandler(config);
@@ -61,6 +63,24 @@ function upload(url: string, id = PAGE_ID, init: RequestInit = {}): Promise<Resp
       ...init.headers,
     },
     body: init.body ?? HTML,
+  });
+}
+
+function submitAnswers(
+  url: string,
+  answers: Record<string, string> = { q1: "Use the server" },
+  init: RequestInit = {},
+): Promise<Response> {
+  return fetch(`${url}/api/pages/${PAGE_ID}/answers`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...init.headers },
+    body: init.body ?? JSON.stringify({ answers }),
+  });
+}
+
+function getResult(url: string, authenticated = true): Promise<Response> {
+  return fetch(`${url}/api/pages/${PAGE_ID}/result`, {
+    headers: authenticated ? { authorization: `Bearer ${TOKEN}` } : {},
   });
 }
 
@@ -150,5 +170,90 @@ describe("viz-server", () => {
     const instance = await start();
     assert.equal((await fetch(`${instance.url}/pages/${PAGE_ID}`)).status, 404);
     assert.equal((await fetch(`${instance.url}/nope`)).status, 404);
+  });
+
+  test("validates answer submissions", async () => {
+    const instance = await start({ maxAnswerBytes: 32 });
+    assert.equal((await submitAnswers(instance.url, { q: "x" })).status, 404);
+    assert.equal((await upload(instance.url)).status, 201);
+
+    const wrongType = await submitAnswers(instance.url, {}, {
+      headers: { "content-type": "text/plain" },
+      body: "nope",
+    });
+    assert.equal(wrongType.status, 415);
+
+    const invalidJson = await submitAnswers(instance.url, {}, { body: "{" });
+    assert.equal(invalidJson.status, 400);
+
+    const invalidAnswers = await submitAnswers(instance.url, {}, { body: JSON.stringify({ answers: { q1: 42 } }) });
+    assert.equal(invalidAnswers.status, 400);
+
+    const oversized = await submitAnswers(instance.url, {}, { body: JSON.stringify({ answers: { q1: "x".repeat(40) } }) });
+    assert.equal(oversized.status, 413);
+  });
+
+  test("persists the first answer and rejects later submissions", async () => {
+    const instance = await start();
+    assert.equal((await upload(instance.url)).status, 201);
+
+    const first = await submitAnswers(instance.url);
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { status: "accepted" });
+    assert.equal((await submitAnswers(instance.url, { q1: "Changed" })).status, 409);
+
+    const metadata = JSON.parse(
+      await readFile(path.join(instance.dataDir, "pages", `${PAGE_ID}.json`), "utf8"),
+    ) as Record<string, unknown>;
+    assert.equal(metadata.status, "answered");
+    assert.match(String(metadata.answeredAt), /^\d{4}-\d{2}-\d{2}T/);
+    assert.deepEqual(metadata.answers, { q1: "Use the server" });
+  });
+
+  test("allows only one concurrent first answer", async () => {
+    const instance = await start();
+    assert.equal((await upload(instance.url)).status, 201);
+    const responses = await Promise.all([
+      submitAnswers(instance.url, { q1: "First candidate" }),
+      submitAnswers(instance.url, { q1: "Second candidate" }),
+    ]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+  });
+
+  test("requires authentication and an existing page for results", async () => {
+    const instance = await start();
+    assert.equal((await getResult(instance.url, false)).status, 401);
+    assert.equal((await getResult(instance.url)).status, 404);
+  });
+
+  test("returns 204 when a long poll expires without an answer", async () => {
+    const instance = await start({ resultWaitMs: 20 });
+    assert.equal((await upload(instance.url)).status, 201);
+    assert.equal((await getResult(instance.url)).status, 204);
+  });
+
+  test("wakes a long poll when the browser submits an answer", async () => {
+    const instance = await start({ resultWaitMs: 1_000 });
+    assert.equal((await upload(instance.url)).status, 201);
+    const pending = getResult(instance.url);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal((await submitAnswers(instance.url)).status, 200);
+
+    const response = await pending;
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { answers: { q1: "Use the server" } });
+  });
+
+  test("returns persisted answers immediately after restart", async () => {
+    const first = await start();
+    assert.equal((await upload(first.url)).status, 201);
+    assert.equal((await submitAnswers(first.url)).status, 200);
+    const dataDir = first.dataDir;
+    await stop(first);
+
+    const second = await start({ dataDir, resultWaitMs: 1_000 });
+    const response = await getResult(second.url);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { answers: { q1: "Use the server" } });
   });
 });

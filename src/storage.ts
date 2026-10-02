@@ -4,15 +4,18 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { FileHandle } from "node:fs/promises";
 
+export type Answers = Record<string, string>;
+
 export interface PageMetadata {
   id: string;
   createdAt: string;
-  status: "waiting";
-  answeredAt: null;
-  answers: null;
+  status: "waiting" | "answered";
+  answeredAt: string | null;
+  answers: Answers | null;
 }
 
 export class DuplicatePageError extends Error {}
+export class DuplicateAnswerError extends Error {}
 export class MissingPageError extends Error {}
 
 export class PageStorage {
@@ -85,6 +88,53 @@ export class PageStorage {
     } catch (error) {
       if (isCode(error, "ENOENT")) throw new MissingPageError(id);
       throw error;
+    }
+  }
+
+  async readMetadata(id: string): Promise<PageMetadata> {
+    try {
+      return JSON.parse(await readFile(this.file(id, "json"), "utf8")) as PageMetadata;
+    } catch (error) {
+      if (isCode(error, "ENOENT")) throw new MissingPageError(id);
+      throw error;
+    }
+  }
+
+  async submitAnswers(id: string, answers: Answers): Promise<PageMetadata> {
+    const lockPath = this.file(id, "answer.lock");
+    let lock: FileHandle;
+    try {
+      lock = await open(lockPath, "wx", 0o600);
+    } catch (error) {
+      if (isCode(error, "EEXIST")) throw new DuplicateAnswerError(id);
+      throw error;
+    }
+
+    try {
+      const metadata = await this.readMetadata(id);
+      if (metadata.status === "answered") throw new DuplicateAnswerError(id);
+      const answered: PageMetadata = {
+        ...metadata,
+        status: "answered",
+        answeredAt: new Date().toISOString(),
+        answers,
+      };
+      const temporary = this.temporary(id, "json");
+      try {
+        await writeFile(temporary, `${JSON.stringify(answered, null, 2)}\n`, {
+          encoding: "utf8",
+          mode: 0o600,
+          flag: "wx",
+        });
+        await rename(temporary, this.file(id, "json"));
+      } catch (error) {
+        await rm(temporary, { force: true });
+        throw error;
+      }
+      return answered;
+    } finally {
+      await lock.close();
+      await rm(lockPath, { force: true });
     }
   }
 

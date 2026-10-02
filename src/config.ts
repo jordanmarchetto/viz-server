@@ -5,10 +5,14 @@ export interface Config {
   token: string;
   dataDir: string;
   maxPageBytes: number;
+  maxAnswerBytes: number;
+  resultWaitMs: number;
 }
 
 const DEFAULT_PORT = 5008;
 const DEFAULT_MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const DEFAULT_MAX_ANSWER_BYTES = 64 * 1024;
+const DEFAULT_RESULT_WAIT_MS = 25_000;
 
 function positiveInteger(value: string | undefined, name: string, fallback: number): number {
   if (value === undefined) return fallback;
@@ -49,5 +53,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     token,
     dataDir: env.DATA_DIR?.trim() || "/data",
     maxPageBytes: positiveInteger(env.MAX_PAGE_BYTES, "MAX_PAGE_BYTES", DEFAULT_MAX_PAGE_BYTES),
+    maxAnswerBytes: positiveInteger(env.MAX_ANSWER_BYTES, "MAX_ANSWER_BYTES", DEFAULT_MAX_ANSWER_BYTES),
+    resultWaitMs: positiveInteger(env.RESULT_WAIT_MS, "RESULT_WAIT_MS", DEFAULT_RESULT_WAIT_MS),
   };
 }
