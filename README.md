@@ -5,8 +5,8 @@ It accepts finished HTML from a `viz` client, stores it, and returns a URL that
 works from another machine. The server never renders viz's page schema, so the
 CLI and server do not need matching templates or releases.
 
-This first iteration hosts detached pages. Browser answers and blocking CLI
-sessions are planned next.
+The server also accepts the first browser answer for a page and exposes it to an
+authenticated CLI through reconnectable long polling.
 
 ## Requirements
 
@@ -68,6 +68,8 @@ who knows their random URL. Uploads require the shared bearer token.
 | `HOST` | `0.0.0.0` | Listening address |
 | `DATA_DIR` | `/data` | Persistent storage root |
 | `MAX_PAGE_BYTES` | `2097152` | Maximum HTML upload size |
+| `MAX_ANSWER_BYTES` | `65536` | Maximum browser answer body size |
+| `RESULT_WAIT_MS` | `25000` | Maximum duration of one result request |
 
 Trailing slashes are removed from `PUBLIC_BASE_URL`.
 
@@ -82,7 +84,8 @@ $DATA_DIR/pages/<id>.json
 
 The JSON sidecar is a commit marker and records creation and answer status. The
 server requires both files before serving a page. Writes use temporary files and
-an exclusive per-page lock, so concurrent uploads cannot overwrite one another.
+exclusive per-page locks, so concurrent uploads cannot overwrite one another and
+only the first answer can win.
 
 ## Docker
 
@@ -130,6 +133,30 @@ page, or `415` for another content type.
 Serves a stored page as UTF-8 HTML. Returns `404` when the page is absent or
 incomplete.
 
+### `POST /api/pages/:id/answers`
+
+Accepts the browser's first answer without putting the shared upload secret in
+the page:
+
+```json
+{"answers":{"q1":"Selected option"}}
+```
+
+Answer IDs and values must be non-empty strings. The first valid submission
+returns `200`; later submissions return `409`. Answers are persisted before the
+server responds.
+
+### `GET /api/pages/:id/result`
+
+Requires `Authorization: Bearer <VIZ_TOKEN>`. Returns persisted answers
+immediately with `200`, or waits for up to `RESULT_WAIT_MS` for a browser answer.
+A wait that expires returns `204`, allowing the CLI to reconnect until its own
+overall timeout expires.
+
+```json
+{"answers":{"q1":"Selected option"}}
+```
+
 ## Development
 
 ```bash
@@ -138,12 +165,11 @@ npm run check
 ```
 
 Tests use temporary directories and ephemeral ports. They cover authentication,
-validation, persistence, duplicate and concurrent uploads, serving, and restart
-behavior.
+validation, persistence, concurrent first-write behavior, long-poll wakeups and
+timeouts, serving, and restart recovery.
 
 ## Planned next steps
 
-1. Add remote detached-page support to the `viz` CLI.
-2. Add browser answer submission and authenticated long polling.
-3. Add remote blocking mode to `viz`.
-4. Add optional indexing, cleanup, and published container images later.
+1. Add remote blocking mode to the `viz` CLI.
+2. Deploy the server and run the full flow through the reverse proxy.
+3. Add optional indexing, cleanup, and published container images later.
