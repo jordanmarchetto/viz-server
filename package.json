@@ -1,0 +1,19 @@
+{
+  "name": "viz-server",
+  "version": "0.1.0",
+  "description": "Optional remote page host for viz",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "start": "node src/main.ts",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,20 @@
+services:
+  viz-server:
+    build: .
+    container_name: viz-server
+    restart: unless-stopped
+    ports:
+      - "5008:5008"
+    environment:
+      PORT: "5008"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL}"
+      VIZ_TOKEN: "${VIZ_TOKEN}"
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5008/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
