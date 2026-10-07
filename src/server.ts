@@ -165,7 +165,7 @@ async function handle(
   }
 
   const page = url.pathname.match(/^\/pages\/([^/]+)$/);
-  if (request.method === "GET" && page) {
+  if ((request.method === "GET" || request.method === "HEAD") && page) {
     const id = page[1];
     if (!PAGE_ID.test(id)) {
       sendJson(response, 404, { error: "page not found" });
@@ -176,8 +176,12 @@ async function handle(
       response.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Length": Buffer.byteLength(html),
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none'",
         "X-Content-Type-Options": "nosniff",
-      }).end(html);
+      }).end(request.method === "HEAD" ? undefined : html);
     } catch (error) {
       if (error instanceof MissingPageError) {
         sendJson(response, 404, { error: "page not found" });

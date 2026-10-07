@@ -30,6 +30,7 @@ async function start(overrides: Partial<Config> = {}): Promise<TestServer> {
     maxPageBytes: 1024,
     maxAnswerBytes: 1024,
     resultWaitMs: 50,
+    pageTtlDays: null,
     ...overrides,
   };
   const handler = await createHandler(config);
@@ -136,7 +137,18 @@ describe("viz-server", () => {
     const page = await fetch(`${instance.url}/pages/${PAGE_ID}`);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type") ?? "", /^text\/html/);
+    assert.equal(page.headers.get("cache-control"), "private, no-store");
+    assert.equal(page.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(page.headers.get("x-frame-options"), "DENY");
+    assert.equal(page.headers.get("content-security-policy"), "frame-ancestors 'none'");
+    assert.equal(page.headers.get("x-content-type-options"), "nosniff");
     assert.equal(await page.text(), HTML);
+
+    const head = await fetch(`${instance.url}/pages/${PAGE_ID}`, { method: "HEAD" });
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get("cache-control"), "private, no-store");
+    assert.equal(head.headers.get("content-security-policy"), "frame-ancestors 'none'");
+    assert.equal(await head.text(), "");
   });
 
   test("does not overwrite a duplicate page", async () => {

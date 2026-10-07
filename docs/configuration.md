@@ -14,6 +14,7 @@
 | `MAX_PAGE_BYTES` | `2097152` | Maximum HTML upload size |
 | `MAX_ANSWER_BYTES` | `65536` | Maximum browser answer body size |
 | `RESULT_WAIT_MS` | `25000` | Maximum duration of one result request |
+| `PAGE_TTL_DAYS` | Unset | Days to retain pages and answers; decimals are accepted |
 
 `PUBLIC_BASE_URL` must be an absolute HTTP or HTTPS URL. Trailing slashes are
 removed. Generate a token with at least 16 characters. For example:
@@ -93,6 +94,16 @@ read capability, so only share a page URL with people who may view it.
 The first browser answer is accepted without exposing the shared token in the
 page. Later submissions receive `409 Conflict`.
 
-Pages and answers remain in `DATA_DIR` indefinitely. There is no automatic
-cleanup or index. Protect and back up that directory according to the
-sensitivity of the rendered content.
+Stored page responses disable browser and intermediary caching, referrer
+sharing, and framing. Generated pages also disable referrer sharing and block
+plugins, injected base URLs, and form submissions when opened as saved files.
+
+Pages and answers remain in `DATA_DIR` indefinitely unless `PAGE_TTL_DAYS` is
+set to a positive number. When configured, the server removes expired HTML and
+JSON sidecars at startup and every 24 hours. The creation timestamp controls a
+complete page's expiration. Stale incomplete pairs use their file modification
+time. Cleanup skips pages with an active upload or answer lock and logs only the
+number removed.
+
+Protect and back up `DATA_DIR` according to the sensitivity of the rendered
+content.

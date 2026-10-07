@@ -10,6 +10,7 @@ services:
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL}"
       VIZ_TOKEN: "${VIZ_TOKEN}"
       DATA_DIR: /data
+      PAGE_TTL_DAYS: "${PAGE_TTL_DAYS:-}"
     volumes:
       - ./data:/data
     healthcheck:

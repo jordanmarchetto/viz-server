@@ -30,7 +30,7 @@ npm run check
 
 Tests use temporary directories and ephemeral ports. They cover authentication,
 validation, persistence, concurrent first-write behavior, long-poll wakeups and
-timeouts, page serving, and restart recovery.
+timeouts, secure page serving, retention cleanup, and restart recovery.
 
 ## Project layout
 
@@ -57,4 +57,6 @@ marker. The server requires both files before serving a page.
 
 Writes use temporary files and exclusive per-page locks. Concurrent uploads
 cannot overwrite one another, and only the first answer can win. Persisted
-answers remain available after a server restart.
+answers remain available after a server restart. When retention is configured,
+cleanup removes an expired HTML file and its JSON sidecar together and skips
+active upload and answer locks.

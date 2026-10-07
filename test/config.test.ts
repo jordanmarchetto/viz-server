@@ -18,6 +18,7 @@ describe("configuration", () => {
       maxPageBytes: 2 * 1024 * 1024,
       maxAnswerBytes: 64 * 1024,
       resultWaitMs: 25_000,
+      pageTtlDays: null,
     });
   });
 
@@ -30,6 +31,7 @@ describe("configuration", () => {
       MAX_PAGE_BYTES: "4096",
       MAX_ANSWER_BYTES: "2048",
       RESULT_WAIT_MS: "30000",
+      PAGE_TTL_DAYS: "7.5",
     });
     assert.equal(config.host, "127.0.0.1");
     assert.equal(config.port, 9000);
@@ -37,6 +39,7 @@ describe("configuration", () => {
     assert.equal(config.maxPageBytes, 4096);
     assert.equal(config.maxAnswerBytes, 2048);
     assert.equal(config.resultWaitMs, 30_000);
+    assert.equal(config.pageTtlDays, 7.5);
   });
 
   test("rejects missing secrets and invalid URLs or numbers", () => {
@@ -47,6 +50,8 @@ describe("configuration", () => {
     assert.throws(() => loadConfig({ ...REQUIRED, MAX_PAGE_BYTES: "nope" }), /positive integer/);
     assert.throws(() => loadConfig({ ...REQUIRED, MAX_ANSWER_BYTES: "0" }), /positive integer/);
     assert.throws(() => loadConfig({ ...REQUIRED, RESULT_WAIT_MS: "nope" }), /positive integer/);
+    assert.throws(() => loadConfig({ ...REQUIRED, PAGE_TTL_DAYS: "0" }), /positive number/);
+    assert.throws(() => loadConfig({ ...REQUIRED, PAGE_TTL_DAYS: "nope" }), /positive number/);
     assert.throws(() => loadConfig({ ...REQUIRED, VIZ_TOKEN: "too-short" }), /at least 16/);
   });
 });

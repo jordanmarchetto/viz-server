@@ -7,6 +7,7 @@ export interface Config {
   maxPageBytes: number;
   maxAnswerBytes: number;
   resultWaitMs: number;
+  pageTtlDays: number | null;
 }
 
 const DEFAULT_PORT = 5008;
@@ -19,6 +20,15 @@ function positiveInteger(value: string | undefined, name: string, fallback: numb
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function optionalPositiveNumber(value: string | undefined, name: string): number | null {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number`);
   }
   return parsed;
 }
@@ -55,5 +65,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     maxPageBytes: positiveInteger(env.MAX_PAGE_BYTES, "MAX_PAGE_BYTES", DEFAULT_MAX_PAGE_BYTES),
     maxAnswerBytes: positiveInteger(env.MAX_ANSWER_BYTES, "MAX_ANSWER_BYTES", DEFAULT_MAX_ANSWER_BYTES),
     resultWaitMs: positiveInteger(env.RESULT_WAIT_MS, "RESULT_WAIT_MS", DEFAULT_RESULT_WAIT_MS),
+    pageTtlDays: optionalPositiveNumber(env.PAGE_TTL_DAYS, "PAGE_TTL_DAYS"),
   };
 }

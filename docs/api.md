@@ -52,6 +52,17 @@ The endpoint returns `409` for a duplicate ID, `413` for an oversized page, and
 Serves a stored page as UTF-8 HTML. The request does not require the shared
 token. It returns `404` when the page is absent or incomplete.
 
+Stored pages include response headers that prevent caching, referrer sharing,
+and framing:
+
+```http
+Cache-Control: private, no-store
+Referrer-Policy: no-referrer
+X-Frame-Options: DENY
+Content-Security-Policy: frame-ancestors 'none'
+X-Content-Type-Options: nosniff
+```
+
 ## `POST /api/pages/:id/answers`
 
 Accepts the first browser answer for a page:

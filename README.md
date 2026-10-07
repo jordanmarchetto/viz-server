@@ -113,8 +113,8 @@ Pages with decisions can also submit answers through the server. The waiting
 - Put the server behind HTTPS when it crosses an untrusted network.
 - Keep `VIZ_TOKEN` secret. It authorizes page uploads and answer retrieval.
 - Treat page URLs as private links. Anyone who knows a URL can view that page.
-- Persist and protect `DATA_DIR`. Pages and answers are not removed
-  automatically.
+- Persist and protect `DATA_DIR`. Pages and answers remain indefinitely unless
+  you configure `PAGE_TTL_DAYS`.
 
 See [Configuration and deployment](docs/configuration.md) for reverse-proxy
 requirements, environment variables, storage, and security details.
