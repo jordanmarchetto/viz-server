@@ -70,8 +70,11 @@ HOST_PORT=8080
 PAGE_TTL_DAYS=30
 ```
 
-The Compose example binds only to `127.0.0.1`. To keep your host on port 5008,
-set both `HOST_PORT=5008` and `PUBLIC_BASE_URL=http://localhost:5008`.
+The Compose example binds only to `127.0.0.1`. To use another host port, change
+`HOST_PORT` and `PUBLIC_BASE_URL` together. For example, use `HOST_PORT=5008`
+and `PUBLIC_BASE_URL=http://localhost:5008`.
+
+Set `VIZ_TOKEN` before starting. The server rejects a missing or short token.
 
 Start the server and check its health:
 
@@ -132,3 +135,14 @@ requirements, environment variables, storage, and security details.
 - [HTTP API](docs/api.md): Upload, page, answer, result, and health endpoints.
 - [Development](docs/development.md): Local Node setup, tests, project layout,
   and the persistence model.
+
+## Security
+
+Report vulnerabilities through
+[GitHub private vulnerability reporting](https://github.com/jordanmarchetto/viz-server/security/advisories/new).
+Do not include sensitive details in a public issue. See the
+[security policy](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)
