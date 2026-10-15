@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+npm-debug.log
+scratch
+test
+data
+.env
+*.md
+!README.md

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env*
+!.env.example
+*.pem
+*.key
+data/
+scratch/
+.DS_Store

@@ -1,0 +1,117 @@
+# Configuration and deployment
+
+`viz-server` reads its configuration from environment variables when it starts.
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|---|---:|---|
+| `PUBLIC_BASE_URL` | Required | Browser-facing origin included in uploaded page URLs |
+| `VIZ_TOKEN` | Required | Shared client secret; at least 16 characters |
+| `PORT` | `8080` | Listening port |
+| `HOST` | `0.0.0.0` | Listening address |
+| `DATA_DIR` | `/data` | Persistent storage root |
+| `MAX_PAGE_BYTES` | `2097152` | Maximum HTML upload size |
+| `MAX_ANSWER_BYTES` | `65536` | Maximum browser answer body size |
+| `RESULT_WAIT_MS` | `25000` | Maximum duration of one result request |
+| `PAGE_TTL_DAYS` | Unset | Days to retain pages and answers; decimals are accepted |
+
+`PUBLIC_BASE_URL` must be an absolute HTTP or HTTPS URL. Trailing slashes are
+removed. Generate a token with at least 16 characters. For example:
+
+```bash
+openssl rand -hex 32
+```
+
+## Docker Compose
+
+Copy the sample files into a runtime directory:
+
+```bash
+cp docker-compose.example.yaml docker-compose.yaml
+cp .env.example .env
+mkdir -p data
+```
+
+Set both required values in `.env`:
+
+```dotenv
+PUBLIC_BASE_URL=http://localhost:8080
+VIZ_TOKEN=replace-with-the-output-of-openssl-rand
+HOST_PORT=8080
+PAGE_TTL_DAYS=30
+```
+
+Start the server:
+
+```bash
+docker compose up --build -d
+docker compose ps
+curl http://localhost:8080/health
+```
+
+The sample builds the image locally, stores data in `./data`, and binds the
+host port only to `127.0.0.1`. `HOST_PORT` is a Compose-only setting for the
+host-side port. To keep a local deployment on port 5008, set `HOST_PORT=5008`
+and use `http://localhost:5008` for `PUBLIC_BASE_URL` and the client server URL.
+
+If the container cannot write to `./data`, make it writable by UID 1000, the
+unprivileged `node` user in the image.
+
+## Connect a viz client
+
+On every machine that runs `viz`, configure the API address and the same shared
+token:
+
+```bash
+viz config remote
+# Server URL: http://server.home:8080
+# Shared token: [input is hidden]
+```
+
+The server URL must be reachable from the CLI. It may differ from
+`PUBLIC_BASE_URL`, which must be reachable from the browser. For example, the
+CLI can upload over a private network while the browser opens an HTTPS URL
+through a reverse proxy.
+
+Run `viz config show` to inspect the active client configuration without
+printing the token. Run `viz config disable` to return the client to local-only
+mode.
+
+## Reverse proxy
+
+For access outside a trusted private network, place `viz-server` behind an HTTPS
+reverse proxy. Configure the proxy to:
+
+- Forward the browser routes and `/api/` routes to port 8080.
+- Allow HTML uploads up to `MAX_PAGE_BYTES`.
+- Keep result requests open longer than `RESULT_WAIT_MS`.
+- Preserve the request method, body, content type, and `Authorization` header.
+
+Set `PUBLIC_BASE_URL` to the external HTTPS origin. The server uses this value
+when it returns a browser link after upload.
+
+## Security and retention
+
+Uploads and result polling require the shared bearer token. Browser page URLs
+do not require authentication. The random UUID in each URL is a read/write
+capability: anyone who knows it can view the page and submit its first answer.
+That answer may resume a waiting `viz` CLI, so only share the URL with people
+who may both view and answer the page.
+
+The first browser answer is accepted without exposing the shared token in the
+page. Later submissions receive `409 Conflict`.
+
+Stored page responses disable browser and intermediary caching, referrer
+sharing, and framing. Generated pages also disable referrer sharing and block
+plugins, injected base URLs, and form submissions when opened as saved files.
+
+Pages and answers remain in `DATA_DIR` indefinitely unless `PAGE_TTL_DAYS` is
+set to a positive number. When configured, the server removes expired HTML and
+JSON sidecars at startup and every 24 hours. The creation timestamp controls a
+complete page's expiration. Stale incomplete pairs use their file modification
+time. Cleanup skips pages with an active upload or answer lock and logs only the
+number removed.
+
+Protect and back up `DATA_DIR` according to the sensitivity of the rendered
+content.
